@@ -149,7 +149,8 @@ new (class {
     if (!this.keyVault.hasAuth0Keys()) {
 
       let manifest = await (await fetch("manifest.json")).json();
-      repoOwner = manifest.repoOwner;
+      if (manifest.repoOwner)
+        repoOwner = manifest.repoOwner;
 
       let r = await fetch(
         `https://api.github.com/repos/${repoOwner}/ppp/milestones`,
