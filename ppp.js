@@ -142,11 +142,15 @@ new (class {
   async start() {
     this.keyVault = new KeyVault();
 
-    const repoOwner = location.hostname.endsWith('pages.dev')
+    let repoOwner = location.hostname.endsWith('pages.dev')
       ? location.hostname.split('.pages.dev')[0]
       : location.hostname.split('.github.io')[0];
 
     if (!this.keyVault.hasAuth0Keys()) {
+
+      let manifest = await (await fetch("manifest.json")).json();
+      repoOwner = manifest.repoOwner;
+
       let r = await fetch(
         `https://api.github.com/repos/${repoOwner}/ppp/milestones`,
         {

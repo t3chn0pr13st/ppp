@@ -16,5 +16,6 @@
   "lang":        "ru-RU",
   "start_url":   "/",
   "display":     "minimal-ui",
-  "theme_color": "#131722"
+  "theme_color": "#131722",
+  "repo_owner": "t3chn0pr13st"
 }
