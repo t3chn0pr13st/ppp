@@ -1,6 +1,6 @@
 /** @decorator */
 
-import { BrokersPage } from '../../base/brokers/brokers-page.js';
+import { TelegramBotsPage } from '../../base/telegram-bots/telegram-bots-page.js';
 import { html } from '../../lib/template.js';
 import { css } from '../../lib/element/styles/css.js';
 import { when } from '../../lib/element/templating/when.js';
@@ -10,17 +10,17 @@ import {
   loadingIndicator
 } from '../../design/leafygreen/styles/page.js';
 
-export const brokersPageTemplate = (context, definition) => html`
+export const telegramBotsPageTemplate = (context, definition) => html`
   <template>
     <${'ppp-page-header'}>
       <${'ppp-button'}
         appearance="primary"
         slot="controls"
-        @click="${(x) => (x.app.page = 'new-broker')}"
+        @click="${(x) => (x.app.page = 'new-telegram-bot')}"
       >
-        Добавить брокера
+        Добавить бота
       </ppp-button>
-      Список брокеров
+      Список ботов Telegram
     </ppp-page-header>
     <div class="loading-wrapper" ?busy="${(x) => x.busy}">
       <${'ppp-table'} ${ref('table')}
@@ -31,7 +31,7 @@ export const brokersPageTemplate = (context, definition) => html`
   </template>
 `;
 
-export const brokersPageStyles = (context, definition) =>
+export const telegramBotsPageStyles = (context, definition) =>
   css`
     ${basePageStyles}
     .loading-wrapper {
@@ -39,8 +39,8 @@ export const brokersPageStyles = (context, definition) =>
     }
   `;
 
-export const brokersPage = BrokersPage.compose({
-  baseName: 'brokers-page',
-  template: brokersPageTemplate,
-  styles: brokersPageStyles
+export const telegramBotsPage = TelegramBotsPage.compose({
+  baseName: 'telegram-bots-page',
+  template: telegramBotsPageTemplate,
+  styles: telegramBotsPageStyles
 });
