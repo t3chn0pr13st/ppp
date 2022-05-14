@@ -139,45 +139,7 @@ export default new (class {
   async start() {
     this.keyVault = new KeyVault();
 
-<<<<<<< HEAD
-    let repoOwner = location.hostname.endsWith('pages.dev')
-      ? location.hostname.split('.pages.dev')[0]
-      : location.hostname.split('.github.io')[0];
-
-    if (!this.keyVault.hasAuth0Keys()) {
-
-      let manifest = await (await fetch("manifest.json")).json();
-      if (manifest.repo_owner)
-        repoOwner = manifest.repo_owner;
-
-      let r = await fetch(
-        `https://api.github.com/repos/${repoOwner}/ppp/milestones`,
-        {
-          cache: 'no-cache',
-          headers: {
-            Accept: 'application/vnd.github.v3+json'
-          }
-        }
-      );
-
-      // Try to remove potential Cloudflare Pages extra dash
-      if (!r.ok) {
-        r = await fetch(
-          `https://api.github.com/repos/${repoOwner
-            .split('-')
-            .slice(0, -1)
-            .join('-')}/ppp/milestones`,
-          {
-            cache: 'no-cache',
-            headers: {
-              Accept: 'application/vnd.github.v3+json'
-            }
-          }
-        );
-      }
-=======
     (await import(`./i18n/${this.locale}/shared.i18n.js`)).default(this.dict);
->>>>>>> d20602f7bc68617946eea8c5e28ffbb8e6350eb1
 
     if (!this.keyVault.ok()) {
       this.#createApplication({ emergency: true });

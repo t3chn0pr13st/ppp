@@ -14,15 +14,9 @@
     }
   ],
   "lang":        "ru-RU",
-<<<<<<< HEAD
-  "start_url":   "/",
-  "display":     "minimal-ui",
-  "theme_color": "#131722",
-  "repo_owner":  "t3chn0pr13st"
-=======
   "scope":       "./",
   "start_url":   "./",
   "display":     "standalone",
-  "theme_color": "#131722"
->>>>>>> d20602f7bc68617946eea8c5e28ffbb8e6350eb1
+  "theme_color": "#131722",
+  "repo_owner":  "t3chn0pr13st"
 }
