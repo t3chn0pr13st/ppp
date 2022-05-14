@@ -115,7 +115,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (
-    event.request.url.startsWith(location.origin) &&
+    !/vendor/i.test(event.request.url) &&
     event.request.destination === 'script'
   ) {
     return event.respondWith(

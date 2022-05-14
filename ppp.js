@@ -1,147 +1,145 @@
-import { $global } from './lib/element/platform.js';
-import { KeyVault, keySet } from './lib/key-vault.js';
-import { PPPCrypto } from './lib/ppp-crypto.js';
+import { KeyVault } from './shared/key-vault.js';
+import { PPPCrypto } from './shared/ppp-crypto.js';
 
-new (class {
+export default new (class {
   /**
    * Default theme is leafygreen {@link https://www.mongodb.design/}
    */
   theme = 'leafygreen';
 
-  crypto = new PPPCrypto(this);
+  /**
+   * Supported languages.
+   * @type {[string]}
+   */
+  locales = ['ru'];
+
+  crypto = new PPPCrypto();
 
   constructor(appType) {
+    globalThis.ppp = this;
+
     this.appType = appType;
-    $global.ppp = this;
+    this.rootUrl = window.location.origin;
+
+    if (this.rootUrl.endsWith('.github.io')) this.rootUrl += '/ppp';
+
+    const storedLang = localStorage.getItem('ppp-lang');
+
+    this.locale = this.locales.indexOf(storedLang) > -1 ? storedLang : 'ru';
+    this.dict = new Polyglot({
+      locale: this.locale
+    });
+
+    document.documentElement.setAttribute('lang', this.locale);
 
     void this.start();
   }
 
-  async #authenticated() {
-    const token = await this.auth0.getTokenSilently();
-
-    if (token) {
-      const user = await this.auth0.getUser();
-      const req = await fetch(
-        new URL(
-          `/api/v2/users/${user.sub}`,
-          `https://${this.keyVault.getKey('auth0-domain')}`
-        ),
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      const json = await req.json();
-
-      keySet.forEach((k) => this.keyVault.setKey(k, json.app_metadata[k]));
-
-      this.auth0.logout({
-        returnTo:
-          window.location.origin +
-          window.location.pathname +
-          '?page=cloud-services'
-      });
-    }
-  }
-
-  async #authorizeWithAuth0() {
-    const script = document.createElement('script');
-
-    script.onload = async () => {
-      this.auth0 = await createAuth0Client({
-        domain: this.keyVault.getKey('auth0-domain'),
-        client_id: this.keyVault.getKey('auth0-client-id'),
-        audience: `https://${this.keyVault.getKey('auth0-domain')}/api/v2/`,
-        scope: 'read:current_user',
-        redirect_uri:
-          window.location.origin +
-          window.location.pathname +
-          '?page=cloud-services',
-        advancedOptions: {
-          defaultScope: 'openid'
-        }
-      });
-
-      const isAuthenticated = await this.auth0.isAuthenticated();
-
-      if (!isAuthenticated) {
-        const query = window.location.search;
-
-        if (query.includes('code=') && query.includes('state=')) {
-          await this.auth0.handleRedirectCallback();
-          await this.#authenticated();
-        } else {
-          await this.auth0.loginWithRedirect({
-            redirect_uri:
-              window.location.origin +
-              window.location.pathname +
-              '?page=cloud-services'
-          });
-        }
-      } else {
-        await this.#authenticated();
-      }
-    };
-
-    script.src = './vendor/auth0.min.js';
-
-    document.head.append(script);
-  }
-
   async #createApplication({ emergency }) {
-    // TODO - fetch settings from MongoDB
     if (!emergency) {
-      const { getApp, Credentials } = await import('./lib/realm.js');
+      const { getApp, Credentials } = await import('./shared/realm.js');
 
       try {
         this.realm = getApp(this.keyVault.getKey('mongo-app-client-id'));
         this.credentials = Credentials.apiKey(
           this.keyVault.getKey('mongo-api-key')
         );
-        this.user = await this.realm.logIn(this.credentials);
+        this.user = await this.realm.logIn(this.credentials, false);
       } catch (e) {
         console.error(e);
 
         if (e.statusCode === 401 || e.statusCode === 404) {
           this.keyVault.removeKey('mongo-api-key');
 
-          return this.#authorizeWithAuth0();
+          return this.#createApplication({ emergency: true });
         } else {
           return alert(
-            'Вероятно, кластер MongoDB Atlas отключён за неактивность. Перейдите в панель управления MongoDB Atlas и нажмите Resume, а спустя несколько минут обновите текущую страницу'
+            'Не удалось соединиться с MongoDB, попробуйте обновить страницу. Если проблема не решится, вероятно, кластер MongoDB Atlas отключён за неактивность. В таком случае перейдите в панель управления MongoDB Atlas и нажмите Resume, а спустя несколько минут обновите текущую страницу'
           );
         }
       }
     }
 
-    const [{ DesignSystem }, { app }, { appStyles, appTemplate }] =
+    const [{ DesignSystem }, { app, appStyles, appTemplate }] =
       await Promise.all([
-        import('./lib/design-system/design-system.js'),
-        import(`./${this.appType}/app.js`),
-        import(`./design/${this.theme}/app.js`)
+        import('./shared/design-system/design-system.js'),
+        import(`./${this.appType}/${this.theme}/app.js`)
       ]);
 
-    $global.ppp.DesignSystem = DesignSystem;
+    this.DesignSystem = DesignSystem;
 
     DesignSystem.getOrCreate().register(app(appStyles, appTemplate)());
     document.body.setAttribute('appearance', this.theme);
 
+    let workspaces = [];
+    let extensions = [];
+    let settings = {};
+
+    if (!emergency) {
+      try {
+        const code = `
+          const db = context
+            .services.get('mongodb-atlas')
+            .db('ppp');
+
+          const workspaces = db.collection('workspaces').aggregate(
+            [{$match:{removed:{$not:{$eq:true}}}}]
+          );
+
+          const settings = db.collection('app').findOne(
+            {_id:'@settings'}
+          );
+
+          const extensions = db.collection('extensions').aggregate(
+            [{$match:{removed:{$not:{$eq:true}}}}]
+          );
+
+          return {workspaces, settings, extensions};
+        `;
+
+        const evalRequest = await this.user.functions.eval(code);
+
+        workspaces = evalRequest.workspaces;
+        extensions = evalRequest.extensions;
+        settings = evalRequest.settings;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const element = document.createElement('ppp-app');
+
+    if (!emergency) {
+      element.workspaces = workspaces;
+      element.extensions = extensions;
+      element.settings = settings ?? {};
+    }
+
+    element.ppp = this;
+
     this.appElement = document.body.insertBefore(
-      document.createElement('ppp-app'),
+      element,
       document.body.firstChild
     );
 
-    $global.loader.setAttribute('hidden', true);
-    this.appElement.ppp = this;
+    this.appElement.setAttribute('hidden', true);
     this.appElement.setAttribute('appearance', this.theme);
+    document.getElementById('global-loader').setAttribute('hidden', true);
+    this.appElement.removeAttribute('hidden');
+  }
+
+  async i18n(url) {
+    const fileName = url
+      .substr(url.lastIndexOf('/') + 1)
+      .replace('.', '.i18n.');
+
+    (await import(`./i18n/${this.locale}/${fileName}`)).default(this.dict);
   }
 
   async start() {
     this.keyVault = new KeyVault();
 
+<<<<<<< HEAD
     let repoOwner = location.hostname.endsWith('pages.dev')
       ? location.hostname.split('.pages.dev')[0]
       : location.hostname.split('.github.io')[0];
@@ -177,26 +175,12 @@ new (class {
           }
         );
       }
+=======
+    (await import(`./i18n/${this.locale}/shared.i18n.js`)).default(this.dict);
+>>>>>>> d20602f7bc68617946eea8c5e28ffbb8e6350eb1
 
-      if (r.ok) {
-        const json = await r.json();
-        const m = json?.find((m) => m.title.endsWith('auth0.com'));
-
-        if (m) {
-          this.keyVault.setKey('auth0-domain', m.title.trim());
-          this.keyVault.setKey('auth0-client-id', m.description.trim());
-
-          if (!this.keyVault.ok()) {
-            return this.#authorizeWithAuth0();
-          } else {
-            return this.#createApplication({});
-          }
-        } else return this.#createApplication({ emergency: true });
-      } else {
-        return this.#createApplication({ emergency: true });
-      }
-    } else if (!this.keyVault.ok()) {
-      return this.#authorizeWithAuth0();
+    if (!this.keyVault.ok()) {
+      this.#createApplication({ emergency: true });
     } else {
       return this.#createApplication({});
     }
